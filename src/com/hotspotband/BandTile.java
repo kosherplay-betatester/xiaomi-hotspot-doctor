@@ -66,6 +66,7 @@ public abstract class BandTile extends TileService {
         Tile tile = getQsTile();
         if (tile == null) return;
         boolean onThisBand = is5GHz() ? status.isOn5GHz() : status.isOn24GHz();
+        if (status.isOn()) BandStatusService.start(this);
         tile.setIcon(Icon.createWithResource(this, is5GHz() ? R.drawable.ic_tile_5 : R.drawable.ic_tile_24));
         tile.setState(onThisBand ? Tile.STATE_ACTIVE : Tile.STATE_INACTIVE);
         if (status.error != null) {

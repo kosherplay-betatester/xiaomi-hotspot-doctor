@@ -129,6 +129,9 @@ public final class MainActivity extends Activity {
             return;
         }
         shizukuText.setText("Shizuku: connected");
+        // Allow the status-bar band indicator notification (self-grant via Shizuku).
+        new Thread(() -> Runner.shell(this,
+                "pm grant " + getPackageName() + " android.permission.POST_NOTIFICATIONS 2>/dev/null")).start();
         runCommand("status");
     }
 
@@ -143,6 +146,7 @@ public final class MainActivity extends Activity {
                 busy = false;
                 setButtonsEnabled(true);
                 statusText.setText(status.describe());
+                if (status.isOn()) BandStatusService.start(this);
                 TileService.requestListeningState(this, new ComponentName(this, Tile5GHz.class));
                 TileService.requestListeningState(this, new ComponentName(this, Tile24GHz.class));
             });

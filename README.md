@@ -13,6 +13,17 @@ start the hotspot in that mode, so the hotspot shows **Error** and stays off. Sa
 
 A hotspot pinned to a **fixed 5 GHz channel** (149 by default) starts fine. This app pins the channel for you.
 
+## Status-bar band indicator
+
+While the hotspot is on, the app shows an ongoing notification whose small **status-bar icon** (up by the
+clock/battery) is a hotspot broadcast symbol with the band number — **5** or **2.4** — so you can see the
+active band at a glance. It updates automatically and disappears when the hotspot turns off.
+
+On HyperOS, for the status bar to show the band icon (instead of the app's colored icon or a "…"), set
+**Settings → Notifications & Control Center → Status bar → Notification icons** to show individual icons
+(equivalently `settings put system status_bar_notification_style 1`). The app self-grants its notification
+permission via Shizuku.
+
 ## Download
 
 [`release/HotspotBand.apk`](release/HotspotBand.apk)

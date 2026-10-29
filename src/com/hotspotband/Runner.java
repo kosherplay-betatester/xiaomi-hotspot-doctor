@@ -34,6 +34,19 @@ final class Runner {
                 && Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED;
     }
 
+    /** Runs a raw shell command through Shizuku (fire and forget). Used for small self-grants. */
+    static void shell(Context context, String rawCommand) {
+        if (!hasPermission()) return;
+        try {
+            Method newProcess = Shizuku.class.getDeclaredMethod(
+                    "newProcess", String[].class, String[].class, String.class);
+            newProcess.setAccessible(true);
+            Process process = (Process) newProcess.invoke(null, new String[]{"sh", "-c", rawCommand}, null, null);
+            process.waitFor();
+        } catch (Exception ignored) {
+        }
+    }
+
     /** @param command one of: status, 5g CHANNEL, 2g, off */
     static Status run(Context context, String command) {
         if (!waitForShizuku(3000)) return Status.error(NOT_RUNNING);
