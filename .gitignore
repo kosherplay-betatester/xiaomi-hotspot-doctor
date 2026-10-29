@@ -1,0 +1,13 @@
+build/
+*.idsig
+# Signing key stays private - never commit it.
+*.keystore
+*.jks
+# Extracted AARs; only libs/shizuku-*.jar are needed to build.
+libs/*.aar
+libs/api/
+libs/provider/
+libs/aidl/
+libs/shared/
+# The release APK is published under release/.
+/HotspotBand.apk
