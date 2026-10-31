@@ -20,6 +20,20 @@ final class Prefs {
         return "5g " + channel(context);
     }
 
+    /** The 2.4 GHz channel, or 0 to let the phone pick (the default). */
+    static int channel24(Context context) {
+        return context.getSharedPreferences("settings", Context.MODE_PRIVATE).getInt("channel24", 0);
+    }
+
+    static void setChannel24(Context context, int channel) {
+        context.getSharedPreferences("settings", Context.MODE_PRIVATE).edit().putInt("channel24", channel).apply();
+    }
+
+    static String command24GHz(Context context) {
+        int channel = channel24(context);
+        return channel > 0 ? "2g " + channel : "2g";
+    }
+
     /** Whether to turn on USB tethering automatically when a computer is plugged in. */
     static boolean usbAuto(Context context) {
         return context.getSharedPreferences("settings", Context.MODE_PRIVATE).getBoolean("usb_auto", false);

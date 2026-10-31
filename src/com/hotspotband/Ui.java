@@ -45,8 +45,12 @@ final class Ui {
 
     Ui(Context context) {
         this.context = context;
-        dark = (context.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
-                == Configuration.UI_MODE_NIGHT_YES;
+        // The palette follows the saved choice directly: HyperOS can ignore the per-app night
+        // mode, and every color on the screen comes from here anyway.
+        int theme = Prefs.theme(context);
+        dark = theme == THEME_DARK || (theme == THEME_AUTO
+                && (context.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
+                == Configuration.UI_MODE_NIGHT_YES);
         background = dark ? 0xFF0E1015 : 0xFFF3F5FA;
         surface = dark ? 0xFF191C23 : 0xFFFFFFFF;
         surfaceAlt = dark ? 0xFF232733 : 0xFFEEF1F7;

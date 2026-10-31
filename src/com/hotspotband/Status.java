@@ -45,6 +45,28 @@ final class Status {
     long uploaded = -1;
     /** The hotspot password, only reported by the "pass" command. */
     String password;
+    /** Hotspot channels the phone supports in its current country; null when not reported. */
+    int[] channels24;
+    int[] channels5;
+
+    private static int[] channelList(String value) {
+        List<Integer> channels = new ArrayList<>();
+        for (String part : value.split("[, ]+")) {
+            try {
+                if (!part.isEmpty()) channels.add(Integer.parseInt(part));
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        if (channels.isEmpty()) return null;
+        int[] result = new int[channels.size()];
+        for (int i = 0; i < result.length; i++) result[i] = channels.get(i);
+        return result;
+    }
+
+    /** 5 GHz channels that need a radar check (DFS) before the hotspot can use them. */
+    static boolean isDfs(int channel) {
+        return channel >= 52 && channel <= 144;
+    }
 
     static Status error(String message) {
         Status status = new Status();
@@ -91,6 +113,12 @@ final class Status {
                         status.downloaded += Long.parseLong(parts[2]);
                         break;
                     }
+                    case "CHANNELS_24":
+                        status.channels24 = channelList(value);
+                        break;
+                    case "CHANNELS_5":
+                        status.channels5 = channelList(value);
+                        break;
                     case "PASSPHRASE_HEX":
                         status.password = fromHex(value);
                         break;

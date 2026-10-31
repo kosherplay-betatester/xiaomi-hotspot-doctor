@@ -46,7 +46,7 @@ public final class Helper {
                     switchBand(BAND_5GHZ, channel);
                     break;
                 case "2g":
-                    switchBand(BAND_2GHZ, 0);
+                    switchBand(BAND_2GHZ, args.length > 1 ? Integer.parseInt(args[1]) : 0);
                     break;
                 case "off":
                     stopHotspot();

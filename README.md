@@ -50,6 +50,14 @@ The **Hotspot Band** app does the same, shows live status, and lets you pick the
 If you used the HyperOS hotspot settings by mistake, just tap the 5 or 2.4 tile. It overwrites
 the broken setting and keeps your hotspot name and password.
 
+### Channels
+
+You can pick any hotspot channel the phone allows in your country. The app reads the list from the phone,
+for example 2.4 GHz channels 1-13 and 5 GHz channels 36-64, 100-140 and 149-169. **Auto** for 2.4 GHz lets
+the phone choose. 5 GHz always uses a fixed channel, because automatic 5 GHz is what fails on HyperOS.
+Channels marked **DFS** (52-144) need a radar check first, so the hotspot can take about a minute to start on
+them, or not start at all. Picking a channel while the hotspot is on that band applies it right away.
+
 ### Hotspot name
 
 Change the name in the app's **Hotspot name** field and tap **Save name**. Don't use the HyperOS "Set up

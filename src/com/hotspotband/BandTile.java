@@ -49,7 +49,7 @@ public abstract class BandTile extends TileService {
                 status = current;
             } else {
                 boolean onThisBand = is5GHz() ? current.isOn5GHz() : current.isOn24GHz();
-                status = Runner.run(this, onThisBand ? "off" : is5GHz() ? Prefs.command5GHz(this) : "2g");
+                status = Runner.run(this, onThisBand ? "off" : is5GHz() ? Prefs.command5GHz(this) : Prefs.command24GHz(this));
             }
             busy = false;
             main.post(() -> {

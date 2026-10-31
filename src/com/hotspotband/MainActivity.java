@@ -87,6 +87,12 @@ public final class MainActivity extends Activity {
     private TextView band24;
     private TextView band5;
     private final List<TextView> channelChips = new ArrayList<>();
+    private LinearLayout chips24;
+    private LinearLayout chips5;
+    /** The channel lists the chips were last built from, to skip identical rebuilds. */
+    private String channelsKey;
+    /** The hotspot name the history chips last marked as current. */
+    private String historySsid;
     private TextView offButton;
     private EditText nameEdit;
     private TextView nameHint;
@@ -244,7 +250,7 @@ public final class MainActivity extends Activity {
     private void buildBand(LinearLayout root) {
         LinearLayout card = ui.card(root, "Band");
         LinearLayout row = new LinearLayout(this);
-        band24 = bandTile("2.4 GHz", "Longer range", v -> runCommand("2g", false));
+        band24 = bandTile("2.4 GHz", "Longer range", v -> runCommand(Prefs.command24GHz(this), false));
         band5 = bandTile("5 GHz", "Faster", v -> runCommand(Prefs.command5GHz(this), false));
         LinearLayout.LayoutParams left = Ui.weight(1);
         left.rightMargin = ui.dp(6);
@@ -254,35 +260,64 @@ public final class MainActivity extends Activity {
         row.addView(band5, right);
         card.addView(row);
 
-        TextView channelLabel = ui.text("5 GHz channel", 13.5f, ui.textSecondary, true);
-        channelLabel.setPadding(0, ui.dp(16), 0, ui.dp(8));
-        card.addView(channelLabel);
-        HorizontalScrollView chipsScroll = new HorizontalScrollView(this);
-        chipsScroll.setHorizontalScrollBarEnabled(false);
-        LinearLayout chips = new LinearLayout(this);
-        for (int channel : Prefs.CHANNELS) {
-            TextView chip = ui.text(String.valueOf(channel), 14.5f, ui.text, true);
-            chip.setGravity(Gravity.CENTER);
-            chip.setMinWidth(ui.dp(54));
-            chip.setPadding(ui.dp(14), ui.dp(9), ui.dp(14), ui.dp(9));
-            chip.setOnClickListener(v -> selectChannel(channel));
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            params.rightMargin = ui.dp(8);
-            chips.addView(chip, params);
-            chip.setTag(channel);
-            channelChips.add(chip);
-            actionViews.add(chip);
-        }
-        chipsScroll.addView(chips);
-        card.addView(chipsScroll);
-        showChannels();
+        chips24 = channelRow(card, "2.4 GHz channel");
+        chips5 = channelRow(card, "5 GHz channel");
+        TextView dfsHint = ui.text("DFS channels need a radar check first: the hotspot can take about a minute "
+                + "to start on them, or not start at all.", 12, ui.textSecondary, false);
+        dfsHint.setPadding(ui.dp(2), ui.dp(8), 0, 0);
+        card.addView(dfsHint);
+        int[] all24 = new int[13];
+        for (int i = 0; i < all24.length; i++) all24[i] = i + 1;
+        fillChannels(all24, Prefs.CHANNELS);
 
         offButton = ui.outlineButton("Turn hotspot off", Ui.RED, v -> runCommand("off", false));
         card.addView(offButton, ui.matchWidth(16));
         actionViews.add(band24);
         actionViews.add(band5);
         actionViews.add(offButton);
+    }
+
+    private LinearLayout channelRow(LinearLayout card, String label) {
+        TextView title = ui.text(label, 13.5f, ui.textSecondary, true);
+        title.setPadding(0, ui.dp(16), 0, ui.dp(8));
+        card.addView(title);
+        HorizontalScrollView scroll = new HorizontalScrollView(this);
+        scroll.setHorizontalScrollBarEnabled(false);
+        LinearLayout chips = new LinearLayout(this);
+        scroll.addView(chips);
+        card.addView(scroll);
+        return chips;
+    }
+
+    /** Rebuilds the channel chips from the channels the phone supports (0 = automatic). */
+    private void fillChannels(int[] list24, int[] list5) {
+        String key = java.util.Arrays.toString(list24) + java.util.Arrays.toString(list5);
+        if (key.equals(channelsKey)) return;
+        channelsKey = key;
+        for (TextView chip : channelChips) actionViews.remove(chip);
+        channelChips.clear();
+        chips24.removeAllViews();
+        chips5.removeAllViews();
+        addChip(chips24, 1, 0);
+        for (int channel : list24) addChip(chips24, 1, channel);
+        for (int channel : list5) addChip(chips5, 2, channel);
+        showChannels();
+    }
+
+    private void addChip(LinearLayout row, int band, int channel) {
+        String label = channel == 0 ? "Auto" : Status.isDfs(channel) ? channel + " DFS" : String.valueOf(channel);
+        TextView chip = ui.text(label, 14.5f, ui.text, true);
+        chip.setGravity(Gravity.CENTER);
+        chip.setMinWidth(ui.dp(50));
+        chip.setPadding(ui.dp(13), ui.dp(9), ui.dp(13), ui.dp(9));
+        chip.setTag(new int[]{band, channel});
+        chip.setOnClickListener(v -> selectChannel(band, channel));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        params.rightMargin = ui.dp(8);
+        row.addView(chip, params);
+        channelChips.add(chip);
+        actionViews.add(chip);
     }
 
     private TextView bandTile(String label, String hint, View.OnClickListener listener) {
@@ -652,11 +687,20 @@ public final class MainActivity extends Activity {
         runCommand("status", false);
     }
 
-    private void selectChannel(int channel) {
-        Prefs.setChannel(this, channel);
+    private void selectChannel(int band, int channel) {
+        if (band == 1) {
+            Prefs.setChannel24(this, channel);
+        } else {
+            Prefs.setChannel(this, channel);
+        }
         showChannels();
-        // Apply right away if the hotspot is running on another 5 GHz channel.
-        if (last != null && last.isOn5GHz() && last.channel != channel) runCommand("5g " + channel, false);
+        // Apply right away if the hotspot is running on that band on another channel.
+        if (last == null || last.error != null) return;
+        if (band == 2 && last.isOn5GHz() && last.channel != channel) {
+            runCommand(Prefs.command5GHz(this), false);
+        } else if (band == 1 && last.isOn24GHz() && last.channel != channel) {
+            runCommand(Prefs.command24GHz(this), false);
+        }
     }
 
     private void saveName() {
@@ -713,8 +757,15 @@ public final class MainActivity extends Activity {
                 if (status.error == null) {
                     if (changesName) nameEdited = false;
                     showName(status.ssid);
-                    if (Prefs.rememberName(this, status.ssid) || changesName) showHistory();
+                    boolean historyChanged = Prefs.rememberName(this, status.ssid);
+                    if (historyChanged || !status.ssid.equals(historySsid)) {
+                        historySsid = status.ssid;
+                        showHistory();
+                    }
                     showClients(status);
+                    if (status.channels24 != null && status.channels5 != null) {
+                        fillChannels(status.channels24, status.channels5);
+                    }
                     usbTethered = status.usbTethered;
                     showUsb();
                     if (status.password != null) {
@@ -862,11 +913,14 @@ public final class MainActivity extends Activity {
     }
 
     private void showChannels() {
-        int selected = Prefs.channel(this);
+        int selected5 = Prefs.channel(this);
+        int selected24 = Prefs.channel24(this);
         for (TextView chip : channelChips) {
-            boolean active = (int) chip.getTag() == selected;
+            int[] tag = (int[]) chip.getTag();
+            boolean active = tag[1] == (tag[0] == 1 ? selected24 : selected5);
+            int color = tag[0] == 1 ? Ui.TEAL : Ui.VIOLET;
             chip.setTextColor(active ? Color.WHITE : ui.text);
-            chip.setBackground(ui.pressable(active ? ui.rounded(Ui.VIOLET, 20)
+            chip.setBackground(ui.pressable(active ? ui.rounded(color, 20)
                     : ui.outlined(ui.surfaceAlt, ui.stroke, 20), 20));
         }
     }

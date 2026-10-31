@@ -91,6 +91,10 @@ final class Runner {
                 + " /system/bin " + Helper.class.getName() + " " + command + " 2>&1;"
                 + (command.equals("status") ? "" : " sleep 2;") + " dumpsys wifi 2>/dev/null | grep mCurrentSoftApInfoMap"
                 + " | grep -o 'frequency= *[1-9][0-9]*' | head -1;"
+                // Channels the phone allows for the hotspot in its current country.
+                + (details ? " dumpsys wifi 2>/dev/null | grep -m1 mCurrentSoftApCapability"
+                + " | sed 's/.*SupportedChannelListIn24g\\[\\([0-9, ]*\\)\\].*SupportedChannelListIn5g\\[\\([0-9, ]*\\)\\].*/"
+                + "CHANNELS_24=\\1\\nCHANNELS_5=\\2/';" : "")
                 + (details ? DETAILS_SCRIPT : "");
         StringBuilder output = new StringBuilder();
         try {
