@@ -7,23 +7,30 @@ import android.os.Parcel;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Runs as the shell user (through Shizuku or adb) via app_process, with the APK as class path.
  *
- * Usage: Helper status | 5g [channel] | 2g | off
+ * Usage: Helper status | 5g [channel] | 2g | off | name HEX | usb on|off
  *   5g/2g stop the hotspot if it is running, apply the band, then start it again.
+ *   name sets the hotspot name (SSID; UTF-8 bytes as hex, so no shell quoting is needed) and
+ *   restarts the hotspot if it was on, keeping the band, channel and password.
+ *   usb starts or stops USB tethering (sharing the phone's internet over the cable).
  */
 public final class Helper {
     private static final String CALLER = "com.android.shell";
     private static final int BAND_2GHZ = 1;
     private static final int BAND_5GHZ = 2;
     private static final int TETHERING_WIFI = 0;
+    private static final int TETHERING_USB = 1;
     private static final int AP_STATE_DISABLED = 11;
     private static final int AP_STATE_ENABLED = 13;
     private static final int AP_STATE_FAILED = 14;
 
     private static Object wifi;
+    /** Tethering type put into start requests: Wi-Fi, or USB while a usb command runs. */
+    private static int tetheringType = TETHERING_WIFI;
 
     public static void main(String[] args) {
         try {
@@ -43,6 +50,12 @@ public final class Helper {
                 case "off":
                     stopHotspot();
                     printStatus();
+                    break;
+                case "name":
+                    setName(fromHex(args.length > 1 ? args[1] : ""));
+                    break;
+                case "usb":
+                    setUsbTethering(args.length > 1 && args[1].equals("on"));
                     break;
                 default:
                     System.out.println("ERROR=unknown command " + command);
@@ -76,6 +89,56 @@ public final class Helper {
         Object saved = call(wifi, "setSoftApConfiguration", updated);
         System.out.println("CONFIG_SAVED=" + saved);
         startHotspot();
+        printStatus();
+    }
+
+    private static void setName(byte[] ssid) throws Exception {
+        if (ssid.length < 1 || ssid.length > 32) {
+            System.out.println("ERROR=The hotspot name must be 1-32 bytes long");
+            return;
+        }
+        boolean wasOn = apState() != AP_STATE_DISABLED;
+        if (wasOn) {
+            stopHotspot();
+        }
+        SoftApConfiguration current = (SoftApConfiguration) call(wifi, "getSoftApConfiguration");
+        Class<?> builderClass = Class.forName("android.net.wifi.SoftApConfiguration$Builder");
+        Object builder = builderClass.getConstructor(SoftApConfiguration.class).newInstance(current);
+        try {
+            Class<?> wifiSsid = Class.forName("android.net.wifi.WifiSsid");
+            Object value = wifiSsid.getMethod("fromBytes", byte[].class).invoke(null, (Object) ssid);
+            builder = builderClass.getMethod("setWifiSsid", wifiSsid).invoke(builder, value);
+        } catch (ClassNotFoundException | NoSuchMethodException e) {
+            // Before Android 13.
+            builder = builderClass.getMethod("setSsid", String.class)
+                    .invoke(builder, new String(ssid, StandardCharsets.UTF_8));
+        }
+        SoftApConfiguration updated = (SoftApConfiguration) builderClass.getMethod("build").invoke(builder);
+        Object saved = call(wifi, "setSoftApConfiguration", updated);
+        System.out.println("CONFIG_SAVED=" + saved);
+        if (wasOn) {
+            startHotspot();
+        }
+        printStatus();
+    }
+
+    private static byte[] fromHex(String hex) {
+        byte[] bytes = new byte[hex.length() / 2];
+        for (int i = 0; i < bytes.length; i++) {
+            bytes[i] = (byte) Integer.parseInt(hex.substring(i * 2, i * 2 + 2), 16);
+        }
+        return bytes;
+    }
+
+    private static void setUsbTethering(boolean on) throws Exception {
+        tetheringType = TETHERING_USB;
+        Object tethering = asInterface("android.net.ITetheringConnector", getService("tethering"));
+        if (on) {
+            call(tethering, "startTethering", TETHERING_USB);
+        } else {
+            call(tethering, "stopTethering", TETHERING_USB);
+        }
+        System.out.println("USB_REQUESTED=" + (on ? "on" : "off"));
         printStatus();
     }
 
@@ -177,7 +240,7 @@ public final class Helper {
 
     private static Object tetheringRequestParcel(Class<?> type) throws Exception {
         Object parcel = type.getConstructor().newInstance();
-        setField(parcel, "tetheringType", TETHERING_WIFI);
+        setField(parcel, "tetheringType", tetheringType);
         setField(parcel, "exemptFromEntitlementCheck", true);
         setField(parcel, "showProvisioningUi", false);
         setField(parcel, "connectivityScope", 1);
@@ -186,7 +249,7 @@ public final class Helper {
 
     private static Object tetheringRequest() throws Exception {
         Class<?> builderClass = Class.forName("android.net.TetheringManager$TetheringRequest$Builder");
-        Object builder = builderClass.getConstructor(int.class).newInstance(TETHERING_WIFI);
+        Object builder = builderClass.getConstructor(int.class).newInstance(tetheringType);
         try {
             builderClass.getMethod("setExemptFromEntitlementCheck", boolean.class).invoke(builder, true);
             builderClass.getMethod("setShouldShowEntitlementUi", boolean.class).invoke(builder, false);

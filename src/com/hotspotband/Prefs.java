@@ -19,4 +19,13 @@ final class Prefs {
     static String command5GHz(Context context) {
         return "5g " + channel(context);
     }
+
+    /** Whether to turn on USB tethering automatically when a computer is plugged in. */
+    static boolean usbAuto(Context context) {
+        return context.getSharedPreferences("settings", Context.MODE_PRIVATE).getBoolean("usb_auto", false);
+    }
+
+    static void setUsbAuto(Context context, boolean enabled) {
+        context.getSharedPreferences("settings", Context.MODE_PRIVATE).edit().putBoolean("usb_auto", enabled).apply();
+    }
 }

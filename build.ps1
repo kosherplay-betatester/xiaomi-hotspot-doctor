@@ -27,7 +27,7 @@ Step 'aapt2 compile' { & "$tools\aapt2.exe" compile --dir (Join-Path $root 'res'
 Step 'aapt2 link' {
     & "$tools\aapt2.exe" link -o "$out\unsigned.apk" -I $androidJar `
         --manifest (Join-Path $root 'AndroidManifest.xml') --java "$out\gen" `
-        --min-sdk-version 30 --target-sdk-version 35 --version-code 1 --version-name 1.0 "$out\res.zip"
+        --min-sdk-version 30 --target-sdk-version 35 --version-code 2 --version-name 1.1 "$out\res.zip"
 }
 
 $sources = @(Get-ChildItem -Recurse (Join-Path $root 'src'), "$out\gen" -Filter *.java | ForEach-Object FullName)
@@ -46,6 +46,8 @@ Step 'zipalign' { & "$tools\zipalign.exe" -f -p 4 "$out\unsigned.apk" "$out\alig
 
 if (-not (Test-Path $keystore)) {
     Step 'keytool' {
+        # keytool prints progress on stderr, which Windows PowerShell 5 turns into a terminating error.
+        $ErrorActionPreference = 'Continue'
         keytool -genkeypair -keystore $keystore -storepass hotspotband -keypass hotspotband -alias hotspotband `
             -keyalg RSA -keysize 2048 -validity 10000 -dname 'CN=Hotspot Band' 2>&1 | Out-Null
     }

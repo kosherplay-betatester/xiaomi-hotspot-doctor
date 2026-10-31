@@ -1,7 +1,8 @@
 # Xiaomi Hotspot Doctor
 
 Fixes the Xiaomi HyperOS bug where the **5 GHz mobile hotspot will not turn on**, and lets you switch
-between **5 GHz and 2.4 GHz** from Quick Settings tiles.
+between **5 GHz and 2.4 GHz** from Quick Settings tiles. The app also sets the **hotspot name**, lists the
+**connected devices**, and turns on **USB tethering**, automatically if you want, when a computer is plugged in.
 
 Tested on a Xiaomi 17, HyperOS 3 (OS3.0.335), Android 17 (API 37).
 
@@ -49,6 +50,27 @@ The **Hotspot Band** app does the same, shows live status, and lets you pick the
 If you used the HyperOS hotspot settings by mistake, just tap the 5 or 2.4 tile. It overwrites
 the broken setting and keeps your hotspot name and password.
 
+### Hotspot name
+
+Change the name in the app's **Hotspot name** field and tap **Save name**. Don't use the HyperOS "Set up
+hotspot" screen for this, because saving there resets the band to the broken 5 GHz auto-channel mode. The app
+keeps the band, channel and password. If the hotspot is on, it restarts with the new name, and devices
+have to reconnect to it. Names can be 1-32 bytes long, so non-Latin letters count as 2-3 bytes each.
+
+### Connected devices
+
+The app lists the devices using the phone's internet, over Wi-Fi or USB, with each device's name (from
+DHCP), IP address and MAC address. While the app is open, the list refreshes every 5 seconds.
+
+### Share internet over USB
+
+This is the same as **Settings → Connection & sharing → USB tethering**:
+
+- **USB tethering ON/OFF** shares the phone's internet with the computer over the cable.
+- **Turn on automatically when a computer is plugged in** keeps a small, silent notification and turns USB
+  tethering on each time you plug the phone into a computer. A plain charger doesn't trigger it. If you turn
+  USB tethering off while the cable stays in, it stays off until the next time you plug in.
+
 ## How it works
 
 `Helper.java` runs as the shell user, through Shizuku, via `app_process` with the APK as its class path. It:
@@ -57,6 +79,15 @@ the broken setting and keeps your hotspot name and password.
 2. writes the SoftAp configuration with `setChannel(channel, BAND_5GHZ)` or `setBand(BAND_2GHZ)`
    (`IWifiManager.setSoftApConfiguration`),
 3. starts tethering again, so internet sharing works normally.
+
+The other helper commands use the same calls:
+
+- `name` sets the name with `SoftApConfiguration.Builder.setWifiSsid`. The name is passed as UTF-8 hex, so no
+  shell quoting is involved.
+- `usb on|off` starts or stops `TETHERING_USB`.
+
+The connected-devices list comes from the tethered interfaces in `dumpsys tethering`, the ARP table
+(`/proc/net/arp`) and the DHCP server log in `dumpsys network_stack`, which provides the host names.
 
 ## Building
 
@@ -80,5 +111,7 @@ signed with the same key.
 | `src/com/hotspotband/Helper.java` | Privileged part: sets band/channel, stops/starts tethering |
 | `src/com/hotspotband/Runner.java` | Launches the helper through Shizuku and parses its output |
 | `src/com/hotspotband/BandTile.java` | Quick Settings tiles (`Tile5GHz`, `Tile24GHz`) |
-| `src/com/hotspotband/MainActivity.java` | App screen |
+| `src/com/hotspotband/MainActivity.java` | App screen: status, name, band, connected devices, USB |
+| `src/com/hotspotband/UsbAutoService.java` | Turns on USB tethering when a computer is plugged in |
+| `src/com/hotspotband/BootReceiver.java` | Restarts the USB watcher after a reboot or app update |
 | `libs/shizuku-*.jar` | Shizuku client library 13.1.5 (Apache-2.0) |
