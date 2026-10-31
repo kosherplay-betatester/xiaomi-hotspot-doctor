@@ -37,6 +37,14 @@ final class Status {
     String error;
     boolean usbTethered;
     final List<Client> clients = new ArrayList<>();
+    /**
+     * Bytes the connected devices downloaded and uploaded since sharing started, summed over all
+     * tethered interfaces (the phone transmits what the devices download). -1 when not reported.
+     */
+    long downloaded = -1;
+    long uploaded = -1;
+    /** The hotspot password, only reported by the "pass" command. */
+    String password;
 
     static Status error(String message) {
         Status status = new Status();
@@ -72,6 +80,20 @@ final class Status {
                         status.clients.add(client);
                         break;
                     }
+                    case "IFSTAT": {
+                        String[] parts = value.split(" ");
+                        if (parts.length < 3) break;
+                        if (status.downloaded < 0) {
+                            status.downloaded = 0;
+                            status.uploaded = 0;
+                        }
+                        status.uploaded += Long.parseLong(parts[1]);
+                        status.downloaded += Long.parseLong(parts[2]);
+                        break;
+                    }
+                    case "PASSPHRASE_HEX":
+                        status.password = fromHex(value);
+                        break;
                     case "HOST": {
                         int space = value.indexOf(' ');
                         if (space > 0) hostNames.put(value.substring(0, space).toLowerCase(), value.substring(space + 1));
@@ -94,6 +116,27 @@ final class Status {
     private static String unquote(String value) {
         return value.length() >= 2 && value.startsWith("\"") && value.endsWith("\"")
                 ? value.substring(1, value.length() - 1) : value;
+    }
+
+    private static String fromHex(String hex) {
+        byte[] bytes = new byte[hex.length() / 2];
+        for (int i = 0; i < bytes.length; i++) {
+            bytes[i] = (byte) Integer.parseInt(hex.substring(i * 2, i * 2 + 2), 16);
+        }
+        return new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    /** Formats a byte count as "12.3 MB". */
+    static String bytes(long value) {
+        if (value < 1024) return value + " B";
+        String[] units = {"KB", "MB", "GB", "TB"};
+        double scaled = value;
+        int unit = -1;
+        while (scaled >= 1024 && unit < units.length - 1) {
+            scaled /= 1024;
+            unit++;
+        }
+        return String.format(java.util.Locale.US, scaled >= 100 ? "%.0f %s" : "%.1f %s", scaled, units[unit]);
     }
 
     static boolean isUsbInterface(String iface) {

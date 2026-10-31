@@ -57,6 +57,24 @@ hotspot" screen for this, because saving there resets the band to the broken 5 G
 keeps the band, channel and password. If the hotspot is on, it restarts with the new name, and devices
 have to reconnect to it. Names can be 1-32 bytes long, so non-Latin letters count as 2-3 bytes each.
 
+The last 10 names you used appear as chips under the field. Tap one to switch the hotspot back to that name,
+or long-press it to remove it from the list.
+
+### Password
+
+**Show** and **Copy** the hotspot password, or type a new one and tap **Change**. Changing it here keeps the
+band, channel and security type; the HyperOS screen resets the band to the broken 5 GHz auto-channel mode.
+
+### Live status, speed and data used
+
+The status card at the top is colored by state: violet for 5 GHz, teal for 2.4 GHz, grey when off and red when
+something is wrong. It shows the name, channel, frequency, number of devices, live download and upload speed,
+and the data used since sharing started.
+
+### Appearance
+
+Choose **Auto**, which follows the phone's dark mode, **Light** or **Dark**.
+
 ### Connected devices
 
 The app lists the devices using the phone's internet, over Wi-Fi or USB, with each device's name (from

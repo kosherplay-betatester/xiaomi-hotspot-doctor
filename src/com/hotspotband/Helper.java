@@ -12,10 +12,11 @@ import java.nio.charset.StandardCharsets;
 /**
  * Runs as the shell user (through Shizuku or adb) via app_process, with the APK as class path.
  *
- * Usage: Helper status | 5g [channel] | 2g | off | name HEX | usb on|off
+ * Usage: Helper status | 5g [channel] | 2g | off | name HEX | pass | setpass HEX | usb on|off
  *   5g/2g stop the hotspot if it is running, apply the band, then start it again.
  *   name sets the hotspot name (SSID; UTF-8 bytes as hex, so no shell quoting is needed) and
  *   restarts the hotspot if it was on, keeping the band, channel and password.
+ *   pass prints the password; setpass changes it the same way name changes the name.
  *   usb starts or stops USB tethering (sharing the phone's internet over the cable).
  */
 public final class Helper {
@@ -53,6 +54,12 @@ public final class Helper {
                     break;
                 case "name":
                     setName(fromHex(args.length > 1 ? args[1] : ""));
+                    break;
+                case "pass":
+                    printPassword();
+                    break;
+                case "setpass":
+                    setPassword(new String(fromHex(args.length > 1 ? args[1] : ""), StandardCharsets.UTF_8));
                     break;
                 case "usb":
                     setUsbTethering(args.length > 1 && args[1].equals("on"));
@@ -120,6 +127,48 @@ public final class Helper {
             startHotspot();
         }
         printStatus();
+    }
+
+    /** Prints the password as hex (so any character survives the line-based output). */
+    private static void printPassword() throws Exception {
+        SoftApConfiguration config = (SoftApConfiguration) call(wifi, "getSoftApConfiguration");
+        String passphrase = config.getPassphrase();
+        System.out.println("SECURITY=" + config.getSecurityType());
+        System.out.println("PASSPHRASE_HEX=" + (passphrase == null ? "" : toHex(passphrase)));
+        printStatus();
+    }
+
+    /** Sets the password, keeping the security type (WPA2, WPA3 or both), like setName. */
+    private static void setPassword(String passphrase) throws Exception {
+        if (passphrase.length() < 8 || passphrase.length() > 63) {
+            System.out.println("ERROR=The password must be 8-63 characters long");
+            return;
+        }
+        boolean wasOn = apState() != AP_STATE_DISABLED;
+        if (wasOn) {
+            stopHotspot();
+        }
+        SoftApConfiguration current = (SoftApConfiguration) call(wifi, "getSoftApConfiguration");
+        int security = current.getSecurityType();
+        if (security == SoftApConfiguration.SECURITY_TYPE_OPEN) {
+            security = SoftApConfiguration.SECURITY_TYPE_WPA2_PSK;
+        }
+        Class<?> builderClass = Class.forName("android.net.wifi.SoftApConfiguration$Builder");
+        Object builder = builderClass.getConstructor(SoftApConfiguration.class).newInstance(current);
+        builder = builderClass.getMethod("setPassphrase", String.class, int.class).invoke(builder, passphrase, security);
+        SoftApConfiguration updated = (SoftApConfiguration) builderClass.getMethod("build").invoke(builder);
+        Object saved = call(wifi, "setSoftApConfiguration", updated);
+        System.out.println("CONFIG_SAVED=" + saved);
+        if (wasOn) {
+            startHotspot();
+        }
+        printStatus();
+    }
+
+    private static String toHex(String value) {
+        StringBuilder hex = new StringBuilder();
+        for (byte b : value.getBytes(StandardCharsets.UTF_8)) hex.append(String.format("%02x", b & 0xff));
+        return hex.toString();
     }
 
     private static byte[] fromHex(String hex) {

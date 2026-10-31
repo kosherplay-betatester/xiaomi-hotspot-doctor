@@ -48,18 +48,20 @@ final class Runner {
     }
 
     /**
-     * Lists tethered interfaces (TETHERED=iface), their clients from the ARP table
-     * (CLIENT=mac ip iface) and DHCP host names from the network stack log (HOST=mac name).
+     * Lists tethered interfaces (TETHERED=iface), their byte counters (IFSTAT=iface rx tx),
+     * their clients from the ARP table (CLIENT=mac ip iface) and DHCP host names from the
+     * network stack log (HOST=mac name).
      */
     private static final String DETAILS_SCRIPT = ""
             + " ifs=$(dumpsys tethering 2>/dev/null | grep -E '^ *[A-Za-z0-9_]+ - TetheredState'"
             + " | sed 's/^ *//; s/ .*//' | sort -u);"
             + " for i in $ifs; do echo TETHERED=$i;"
+            + " sed 's/^ *//' /proc/net/dev | awk -F'[: ]+' -v d=\"$i\" '$1==d {print \"IFSTAT=\" $1 \" \" $2 \" \" $10}';"
             + " awk -v d=\"$i\" '$6==d && $3!=\"0x0\" {print \"CLIENT=\" $4 \" \" $1 \" \" $6}' /proc/net/arp; done;"
             + " dumpsys network_stack 2>/dev/null | grep 'hostname: '"
             + " | sed -n 's/.*hwAddr: \\([0-9a-f:]*\\),.*hostname: \\(.*\\)$/HOST=\\1 \\2/p' | sort -u";
 
-    /** @param command one of: status, 5g CHANNEL, 2g, off, name HEX, usb on|off */
+    /** @param command one of: status, 5g CHANNEL, 2g, off, name HEX, pass, setpass HEX, usb on|off */
     static Status run(Context context, String command) {
         return run(context, command, false);
     }
@@ -69,10 +71,13 @@ final class Runner {
         return run(context, command, true);
     }
 
-    /** Builds the "name HEX" command; the hex form keeps any characters away from the shell. */
-    static String nameCommand(String name) {
-        StringBuilder hex = new StringBuilder("name ");
-        for (byte b : name.getBytes(java.nio.charset.StandardCharsets.UTF_8)) {
+    /**
+     * Builds a "VERB HEX" command (name, setpass); the hex form keeps any characters away
+     * from the shell.
+     */
+    static String hexCommand(String verb, String value) {
+        StringBuilder hex = new StringBuilder(verb).append(' ');
+        for (byte b : value.getBytes(java.nio.charset.StandardCharsets.UTF_8)) {
             hex.append(String.format("%02x", b & 0xff));
         }
         return hex.toString();
